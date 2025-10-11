@@ -2,114 +2,113 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Mealar Checkout — Debug</title>
+  <title>Mealar Checkout</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <style>
-    body { font-family: system-ui, sans-serif; background:#fafafa; color:#222; padding:18px; }
-    .card { max-width:720px; margin:24px auto; background:#fff; border-radius:12px; padding:18px; box-shadow:0 6px 18px rgba(0,0,0,0.06); }
-    .ok { color:#166534 } .err { color:#b91c1c }
-    pre { background:#111; color:#fff; padding:12px; border-radius:8px; height:220px; overflow:auto }
-    button { background:#F4A261; border:none; padding:10px 14px; color:white; border-radius:8px; cursor:pointer }
-    .small { font-size:13px; color:#444 }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #fafafa;
+      color: #222;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .card {
+      text-align: center;
+      background: #fff;
+      padding: 24px 28px;
+      border-radius: 12px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+      max-width: 420px;
+      width: 90%;
+    }
+    h2 { color: #F4A261; margin-top: 0; }
+    button {
+      margin-top: 16px;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      background: #F4A261;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h2>Mealar Checkout (debug)</h2>
-    <div id="status">Initializing…</div>
-    <div style="margin-top:12px"><strong>Params</strong><div id="params" class="small"></div></div>
-
-    <div style="margin-top:12px">
-      <button id="openBtn">Open Checkout</button>
-      <button id="openNew" style="margin-left:8px">Open in new tab</button>
-    </div>
-
-    <div style="margin-top:12px">
-      <strong>Logs</strong>
-      <pre id="log">ready.</pre>
-    </div>
-
-    <div style="margin-top:12px" class="small">
-      Tips: 1) Open DevTools (F12) to see console+network. 2) Use test UPI <code>success@razorpay</code> or test card numbers.
-    </div>
+  <div class="card" id="root">
+    <h2>Processing Payment…</h2>
+    <p id="message">Please wait while we open Razorpay Checkout.</p>
   </div>
 
   <script>
-    const qs = new URLSearchParams(location.search);
-    const order_id = qs.get('order_id');
-    const key_id = qs.get('key_id');
-    const logEl = document.getElementById('log');
-    const statusEl = document.getElementById('status');
-    const paramsEl = document.getElementById('params');
-    const openBtn = document.getElementById('openBtn');
-    const openNew = document.getElementById('openNew');
+    (function () {
+      const qs = new URLSearchParams(location.search);
+      const order_id = qs.get("order_id");
+      const key_id = qs.get("key_id");
+      const root = document.getElementById("root");
 
-    function appendLog(...args){
-      console.log(...args);
-      const line = (new Date()).toISOString() + "  " + args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-      logEl.textContent = line + "\n" + logEl.textContent;
-    }
+      function showMessage(title, text, color = "#333") {
+        root.innerHTML = `
+          <h2 style="color:${color}">${title}</h2>
+          <p>${text}</p>
+          <button onclick="window.close()">Close</button>
+          <p style="font-size:13px;color:#666;margin-top:8px;">
+            If this doesn't close automatically, you can safely close this tab.
+          </p>
+        `;
+      }
 
-    function setStatusOk(msg){ statusEl.innerHTML = '<span class="ok">'+msg+'</span>'; appendLog('OK', msg); }
-    function setStatusErr(msg){ statusEl.innerHTML = '<span class="err">'+msg+'</span>'; appendLog('ERR', msg); }
-
-    paramsEl.innerHTML = `<div>order_id: <code>${order_id ?? ''}</code></div><div>key_id: <code>${key_id ?? ''}</code></div>`;
-
-    window.addEventListener('error', (e)=> { appendLog('window.error', e.message, e.filename, e.lineno); setStatusErr('JS error: '+e.message); });
-    window.addEventListener('unhandledrejection', (e)=> { appendLog('unhandledrejection', e.reason); setStatusErr('Unhandled rejection: '+String(e.reason)); });
-
-    openBtn.addEventListener('click', openCheckout);
-    openNew.addEventListener('click', ()=> window.open(location.href, '_blank'));
-
-    if (!order_id || !key_id) {
-      setStatusErr('Missing order_id or key_id in URL query.');
-    } else {
-      setStatusOk('Params present. Will try to open checkout shortly.');
-      // Auto open after small delay to avoid popup-block in some environments
-      setTimeout(()=> {
-        try { openCheckout(); } catch (e) { appendLog('auto open failed', e); setStatusErr('Auto-open failed: '+String(e)); }
-      }, 700);
-    }
-
-    function openCheckout(){
-      if (typeof Razorpay === 'undefined') {
-        setStatusErr('Razorpay Checkout JS not loaded. Network/CSP may be blocking https://checkout.razorpay.com/v1/checkout.js');
-        appendLog('Razorpay is undefined. window.Razorpay:', window.Razorpay);
+      if (!order_id || !key_id) {
+        showMessage("Invalid Request", "Missing order_id or key_id in URL.", "#b91c1c");
         return;
       }
 
-      appendLog('Creating Razorpay options', { key: key_id, order_id });
+      if (typeof Razorpay === "undefined") {
+        showMessage("Error", "Failed to load Razorpay Checkout script.", "#b91c1c");
+        return;
+      }
+
       const options = {
         key: key_id,
         order_id: order_id,
-        name: 'Mealar',
-        description: 'Wallet top-up',
-        theme: { color: '#F4A261' },
-        modal: {
-          ondismiss: function(){ appendLog('Modal dismissed (ondismiss)'); setStatusErr('Modal dismissed or failed'); }
+        name: "Mealar",
+        description: "Wallet Top-up",
+        theme: { color: "#F4A261" },
+        prefill: {
+          name: "Mealar User",
+          email: "test@example.com",
+          contact: "9999999999"
         },
-        handler: function(response){
-          appendLog('handler called', response);
-          document.body.innerHTML = `<div class="card"><h2>Payment success</h2><p>Payment ID: <code>${response.razorpay_payment_id}</code></p><p>Order ID: <code>${response.razorpay_order_id}</code></p><p>Signature: <code>${response.razorpay_signature}</code></p><p>Close this page.</p></div>`;
+        handler: function (response) {
+          // ✅ Redirect back to app using deep link
+          const orderId = response.razorpay_order_id;
+          const paymentId = response.razorpay_payment_id;
+          const deeplink = `mealar://payment-success?order_id=${orderId}&payment_id=${paymentId}`;
+          window.location.href = deeplink;
+
+          // As a fallback, show success message
+          setTimeout(() => {
+            showMessage("Payment Successful", "You may now close this window.", "#166534");
+          }, 2000);
+        },
+        modal: {
+          ondismiss: function () {
+            showMessage("Payment Cancelled", "You closed the payment window.", "#b91c1c");
+          }
         }
       };
 
       try {
         const rzp = new Razorpay(options);
-        try {
-          rzp.open();
-          appendLog('Razorpay.open() invoked');
-          setStatusOk('Checkout opened — complete payment (use test UPI/card).');
-        } catch (openErr) {
-          appendLog('rzp.open() threw', openErr);
-          setStatusErr('rzp.open() exception: '+String(openErr));
-        }
+        rzp.open();
       } catch (err) {
-        appendLog('Error creating Razorpay instance', err);
-        setStatusErr('Failed to create Razorpay: '+String(err));
+        showMessage("Error", "Unable to open Razorpay Checkout.", "#b91c1c");
       }
-    }
+    })();
   </script>
 </body>
 </html>
