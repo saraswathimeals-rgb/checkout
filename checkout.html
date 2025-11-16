@@ -41,7 +41,7 @@
 <body>
   <div class="card" id="root">
     <h2>Processing Payment…</h2>
-    <p id="message">Please wait while we open Razorpay Checkout.</p>
+    <p id="message">Please wait while we open Razorpay UPI Checkout.</p>
   </div>
 
   <script>
@@ -83,20 +83,62 @@
           email: "test@example.com",
           contact: "9999999999"
         },
+        // 🔹 Try to keep only UPI visible / preferred
+        method: {
+          upi: true,
+          card: false,
+          netbanking: false,
+          wallet: false,
+          emi: false,
+          paylater: false
+        },
+        config: {
+          display: {
+            hide: ["card", "netbanking", "wallet", "emi", "paylater"]
+          }
+        },
         handler: function (response) {
-          // ✅ Redirect back to app using deep link
-          const orderId = response.razorpay_order_id;
-          const paymentId = response.razorpay_payment_id;
-          const deeplink = `mealar://payment-success?order_id=${orderId}&payment_id=${paymentId}`;
-          window.location.href = deeplink;
+          const payload = {
+            type: "payment_success",
+            source: "checkout_html",
+            order_id: response.razorpay_order_id || order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature || null
+          };
 
-          // As a fallback, show success message
+          // ✅ Notify React Native WebView (in-app flow)
+          try {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+            }
+          } catch (e) {
+            console.log("postMessage to RN failed", e);
+          }
+
+          // 🔁 Fallback deep-link (for when opened in external browser)
+          try {
+            const deeplink =
+              "mealar://payment-success?order_id=" +
+              encodeURIComponent(payload.order_id || "") +
+              "&payment_id=" +
+              encodeURIComponent(payload.razorpay_payment_id || "");
+            window.location.href = deeplink;
+          } catch (e) {}
+
+          // UI fallback
           setTimeout(() => {
             showMessage("Payment Successful", "You may now close this window.", "#166534");
           }, 2000);
         },
         modal: {
           ondismiss: function () {
+            try {
+              if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                window.ReactNativeWebView.postMessage(
+                  JSON.stringify({ type: "payment_error", reason: "user_cancelled" })
+                );
+              }
+            } catch (e) {}
             showMessage("Payment Cancelled", "You closed the payment window.", "#b91c1c");
           }
         }
@@ -106,6 +148,7 @@
         const rzp = new Razorpay(options);
         rzp.open();
       } catch (err) {
+        console.error("Razorpay open error", err);
         showMessage("Error", "Unable to open Razorpay Checkout.", "#b91c1c");
       }
     })();
