@@ -41,7 +41,7 @@
 <body>
   <div class="card" id="root">
     <h2>Processing Payment…</h2>
-    <p id="message">Please wait while we open Razorpay UPI Checkout.</p>
+    <p id="message">Please wait while we open Razorpay Checkout.</p>
   </div>
 
   <script>
@@ -86,15 +86,15 @@
         // 🔹 Try to keep only UPI visible / preferred
         method: {
           upi: true,
-          card: false,
-          netbanking: false,
+          card: true,
+          netbanking: true,
           wallet: false,
           emi: false,
           paylater: false
         },
         config: {
           display: {
-            hide: ["card", "netbanking", "wallet", "emi", "paylater"]
+            hide: ["wallet", "emi", "paylater"]
           }
         },
         handler: function (response) {
